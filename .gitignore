@@ -1,0 +1,20 @@
+# secrets / environment
+.env
+.env.*
+
+# node / cdk
+node_modules/
+cdk.out/
+.cdk.staging/
+*.tsbuildinfo
+
+# compiled TypeScript
+*.js
+*.d.ts
+
+# python artifacts
+__pycache__/
+*.pyc
+
+# misc
+.DS_Store
