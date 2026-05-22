@@ -103,8 +103,10 @@ def get_remaining_free_quota(access_token: str) -> int | None:
 
 def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     instance_id: str = event["instanceId"]
+    instance_name: str = event.get("name", "")
     session_id: str = event["sessionId"]
     task_token: str = event["taskToken"]
+    instance_label: str = f"{instance_id}（{instance_name}）" if instance_name else instance_id
 
     # 応答受信時に responder が使うトークンを保存(セッションごとに上書き)
     state_table = dynamodb_resource.Table(TABLE_NAME)
@@ -122,7 +124,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     remaining = get_remaining_free_quota(access_token)
     quota_line = f"\n（今月の無料枠 残り 約 {remaining} 通）" if remaining is not None else ""
     message_text = (
-        f"EC2 インスタンス {instance_id} が起動中です。\n"
+        f"EC2 インスタンス {instance_label} が起動中です。\n"
         f"継続しますか？停止しますか？\n"
         f"（5 分以内に応答がない場合は再確認します。無応答が続くと自動停止します）"
         f"{quota_line}"
