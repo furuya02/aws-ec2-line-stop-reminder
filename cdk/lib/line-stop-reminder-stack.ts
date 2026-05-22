@@ -21,9 +21,10 @@ export class LineStopReminderStack extends cdk.Stack {
     const accountSuffix: string = this.node.tryGetContext('suffix') ?? this.account;
     const prefix = `aws-ec2-line-stop-reminder-${accountSuffix}`;
 
-    // 確認間隔(通知間隔)はデフォルト 60 分。-c interval_minutes=N で上書き可能
-    // wait_minutes(再送待ち) / max_retry(再送回数) もデモ用に -c で短縮可能
-    const intervalMinutes: number = Number(this.node.tryGetContext('interval_minutes') ?? 60);
+    // 起動スケジュール: 既定は毎時0分。-c schedule="cron(...) or rate(...)" で上書き可
+    // 注意: 間隔は1通知セッション長(wait_minutes×(max_retry+1)≒既定10分)より長くすること
+    //       (短いと同一インスタンスで実行が重複し taskToken を上書きして破綻する)
+    const scheduleExpression: string = this.node.tryGetContext('schedule') ?? 'cron(0 * * * ? *)';
     const waitMinutes: number = Number(this.node.tryGetContext('wait_minutes') ?? 5);
     const maxRetry: number = Number(this.node.tryGetContext('max_retry') ?? 1);
 
@@ -189,7 +190,8 @@ export class LineStopReminderStack extends cdk.Stack {
     new scheduler.CfnSchedule(this, 'Schedule', {
       name: `${prefix}-schedule`,
       flexibleTimeWindow: { mode: 'OFF' },
-      scheduleExpression: `rate(${intervalMinutes} minutes)`,
+      scheduleExpression,
+      scheduleExpressionTimezone: 'Asia/Tokyo', // 時刻指定 cron 用(毎時0分には影響なし)
       target: {
         arn: stateMachine.stateMachineArn,
         roleArn: schedulerRole.roleArn,
