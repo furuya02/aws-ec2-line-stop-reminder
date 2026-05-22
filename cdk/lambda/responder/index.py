@@ -69,10 +69,35 @@ def resume_state_machine(instance_id: str, session_id: str, status: str) -> None
         print(f"send_task_success skipped: {error}")
 
 
-def reply_message(access_token: str, reply_token: str, message_text: str) -> None:
+def build_result_bubble(title: str, header_color: str, instance_id: str, detail: str) -> dict[str, Any]:
+    """応答結果(継続/停止)を知らせる Flex バブル(カード)を組み立てる。"""
+    return {
+        "type": "bubble",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "backgroundColor": header_color,
+            "paddingAll": "12px",
+            "contents": [
+                {"type": "text", "text": title, "color": "#FFFFFF", "weight": "bold", "size": "md"}
+            ],
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "sm",
+            "contents": [
+                {"type": "text", "text": instance_id, "weight": "bold", "size": "sm", "wrap": True},
+                {"type": "text", "text": detail, "size": "sm", "color": "#555555", "wrap": True, "margin": "sm"},
+            ],
+        },
+    }
+
+
+def reply_flex(access_token: str, reply_token: str, alt_text: str, bubble: dict[str, Any]) -> None:
     request_body = {
         "replyToken": reply_token,
-        "messages": [{"type": "text", "text": message_text}],
+        "messages": [{"type": "flex", "altText": alt_text, "contents": bubble}],
     }
     http_request = urllib.request.Request(
         "https://api.line.me/v2/bot/message/reply",
@@ -118,10 +143,16 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
         if action == "continue":
             resume_state_machine(instance_id, session_id, "continue")
-            reply_message(access_token, reply_token, f"{instance_id} を継続します。")
+            bubble = build_result_bubble(
+                "継続しました", "#06C755", instance_id, "起動を継続します。次回もまた確認します。"
+            )
+            reply_flex(access_token, reply_token, f"{instance_id} を継続します", bubble)
         elif action == "stop":
             ec2_client.stop_instances(InstanceIds=[instance_id])
             resume_state_machine(instance_id, session_id, "stop")
-            reply_message(access_token, reply_token, f"{instance_id} を停止しました。")
+            bubble = build_result_bubble(
+                "停止しました", "#E0334B", instance_id, "インスタンスを停止しました。"
+            )
+            reply_flex(access_token, reply_token, f"{instance_id} を停止しました", bubble)
 
     return {"statusCode": 200, "body": "OK"}

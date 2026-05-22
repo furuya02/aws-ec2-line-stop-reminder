@@ -1,4 +1,4 @@
-"""LINE へ「継続 / 停止」の Quick Reply 付き Push メッセージを送る。
+"""LINE へ「継続 / 停止」ボタン付きの Flex Message(カード)を Push 送信する。
 
 Step Functions の waitForTaskToken で起動され、受け取ったタスクトークンを
 DynamoDB に保存する。ユーザーが応答すると responder がこのトークンで
@@ -31,57 +31,6 @@ def get_secure_parameter(parameter_name: str) -> str:
     return parameter_cache[parameter_name]
 
 
-def push_quick_reply(
-    access_token: str,
-    user_id: str,
-    message_text: str,
-    instance_id: str,
-    session_id: str,
-) -> None:
-    request_body = {
-        "to": user_id,
-        "messages": [
-            {
-                "type": "text",
-                "text": message_text,
-                "quickReply": {
-                    "items": [
-                        {
-                            "type": "action",
-                            "action": {
-                                "type": "postback",
-                                "label": "継続",
-                                "data": f"action=continue&instanceId={instance_id}&session={session_id}",
-                                "displayText": "継続します",
-                            },
-                        },
-                        {
-                            "type": "action",
-                            "action": {
-                                "type": "postback",
-                                "label": "停止",
-                                "data": f"action=stop&instanceId={instance_id}&session={session_id}",
-                                "displayText": "停止します",
-                            },
-                        },
-                    ]
-                },
-            }
-        ],
-    }
-    http_request = urllib.request.Request(
-        "https://api.line.me/v2/bot/message/push",
-        data=json.dumps(request_body).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {access_token}",
-        },
-        method="POST",
-    )
-    with urllib.request.urlopen(http_request) as http_response:
-        http_response.read()
-
-
 def get_remaining_free_quota(access_token: str) -> int | None:
     """今月の送信済み通数から無料枠の残数を概算で返す(取得失敗時は None)。
 
@@ -99,6 +48,106 @@ def get_remaining_free_quota(access_token: str) -> int | None:
     except Exception as error:  # 取得失敗時は残数表示を省略
         print(f"get_remaining_free_quota skipped: {error}")
         return None
+
+
+def build_flex_bubble(
+    instance_id: str,
+    instance_name: str,
+    remaining: int | None,
+    session_id: str,
+) -> dict[str, Any]:
+    """継続/停止ボタン付きの Flex バブル(カード)を組み立てる。"""
+    body_contents: list[dict[str, Any]] = [
+        {"type": "text", "text": "インスタンス", "size": "xs", "color": "#888888"},
+        {"type": "text", "text": instance_id, "weight": "bold", "size": "sm", "wrap": True},
+    ]
+    if instance_name:
+        body_contents.append(
+            {"type": "text", "text": f"Name : {instance_name}", "size": "sm", "color": "#555555", "wrap": True}
+        )
+    body_contents.append({"type": "separator", "margin": "md"})
+    body_contents.append(
+        {
+            "type": "text",
+            "text": "起動したままです。継続しますか？停止しますか？",
+            "wrap": True,
+            "margin": "md",
+            "size": "sm",
+        }
+    )
+    if remaining is not None:
+        body_contents.append(
+            {
+                "type": "text",
+                "text": f"今月の無料枠 残り 約 {remaining} 通",
+                "size": "xs",
+                "color": "#888888",
+                "margin": "md",
+            }
+        )
+
+    return {
+        "type": "bubble",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "backgroundColor": "#ED7100",
+            "paddingAll": "12px",
+            "contents": [
+                {"type": "text", "text": "EC2 起動中の確認", "color": "#FFFFFF", "weight": "bold", "size": "md"}
+            ],
+        },
+        "body": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": body_contents},
+        "footer": {
+            "type": "box",
+            "layout": "horizontal",
+            "spacing": "sm",
+            "contents": [
+                {
+                    "type": "button",
+                    "style": "primary",
+                    "color": "#06C755",
+                    "height": "sm",
+                    "action": {
+                        "type": "postback",
+                        "label": "継続",
+                        "data": f"action=continue&instanceId={instance_id}&session={session_id}",
+                        "displayText": "継続します",
+                    },
+                },
+                {
+                    "type": "button",
+                    "style": "primary",
+                    "color": "#E0334B",
+                    "height": "sm",
+                    "action": {
+                        "type": "postback",
+                        "label": "停止",
+                        "data": f"action=stop&instanceId={instance_id}&session={session_id}",
+                        "displayText": "停止します",
+                    },
+                },
+            ],
+        },
+    }
+
+
+def push_flex_message(access_token: str, user_id: str, alt_text: str, bubble: dict[str, Any]) -> None:
+    request_body = {
+        "to": user_id,
+        "messages": [{"type": "flex", "altText": alt_text, "contents": bubble}],
+    }
+    http_request = urllib.request.Request(
+        "https://api.line.me/v2/bot/message/push",
+        data=json.dumps(request_body).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {access_token}",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(http_request) as http_response:
+        http_response.read()
 
 
 def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
@@ -122,12 +171,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     access_token = get_secure_parameter(TOKEN_PARAM)
     user_id = get_secure_parameter(USER_PARAM)
     remaining = get_remaining_free_quota(access_token)
-    quota_line = f"\n（今月の無料枠 残り 約 {remaining} 通）" if remaining is not None else ""
-    message_text = (
-        f"EC2 インスタンス {instance_label} が起動中です。\n"
-        f"継続しますか？停止しますか？\n"
-        f"（5 分以内に応答がない場合は再確認します。無応答が続くと自動停止します）"
-        f"{quota_line}"
-    )
-    push_quick_reply(access_token, user_id, message_text, instance_id, session_id)
+    bubble = build_flex_bubble(instance_id, instance_name, remaining, session_id)
+    alt_text = f"EC2 インスタンス {instance_label} が起動中です。継続しますか？停止しますか？"
+    push_flex_message(access_token, user_id, alt_text, bubble)
     return {"instanceId": instance_id}

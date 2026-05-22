@@ -1,0 +1,36 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="line-oa-icon" name="icon">
+    <mxGraphModel dx="640" dy="640" grid="0" gridSize="10" guides="0" tooltips="0" connect="0" arrows="0" fold="0" page="1" pageScale="1" pageWidth="640" pageHeight="640" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- 背景(AWS オレンジのグラデーション正方形) -->
+        <mxCell id="bg" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FF9900;gradientColor=#EC7211;gradientDirection=north;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="0" y="0" width="640" height="640" as="geometry" />
+        </mxCell>
+
+        <!-- 電源マーク: 白いリング -->
+        <mxCell id="ring" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#FFFFFF;strokeWidth=26;" vertex="1" parent="1">
+          <mxGeometry x="218" y="128" width="204" height="204" as="geometry" />
+        </mxCell>
+
+        <!-- 電源マーク: リング上部の切れ目(背景色で隠す) -->
+        <mxCell id="gap" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FF9900;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="300" y="112" width="40" height="46" as="geometry" />
+        </mxCell>
+
+        <!-- 電源マーク: 中央の縦バー -->
+        <mxCell id="bar" value="" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="307" y="104" width="26" height="134" as="geometry" />
+        </mxCell>
+
+        <!-- EC2 文字 -->
+        <mxCell id="ec2" value="EC2" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontColor=#FFFFFF;fontSize=180;fontStyle=1;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="70" y="360" width="500" height="180" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
