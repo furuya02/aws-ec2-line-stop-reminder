@@ -109,6 +109,7 @@ export class LineStopReminderStack extends cdk.Stack {
       taskTimeout: sfn.Timeout.duration(cdk.Duration.minutes(waitMinutes)),
       payload: sfn.TaskInput.fromObject({
         instanceId: sfn.JsonPath.stringAt('$.instanceId'),
+        name: sfn.JsonPath.stringAt('$.name'),
         sessionId: sfn.JsonPath.stringAt('$.sessionId'),
         retryCount: sfn.JsonPath.numberAt('$.retryCount'),
         taskToken: sfn.JsonPath.taskToken,
@@ -128,6 +129,7 @@ export class LineStopReminderStack extends cdk.Stack {
     const incrementRetry = new sfn.Pass(this, 'IncrementRetry', {
       parameters: {
         instanceId: sfn.JsonPath.stringAt('$.instanceId'),
+        name: sfn.JsonPath.stringAt('$.name'),
         sessionId: sfn.JsonPath.stringAt('$.sessionId'),
         retryCount: sfn.JsonPath.numberAt('States.MathAdd($.retryCount, 1)'),
       },
@@ -154,9 +156,10 @@ export class LineStopReminderStack extends cdk.Stack {
     });
 
     const processInstances = new sfn.Map(this, 'ProcessInstances', {
-      itemsPath: sfn.JsonPath.stringAt('$.instanceIds'),
+      itemsPath: sfn.JsonPath.stringAt('$.instances'),
       itemSelector: {
-        instanceId: sfn.JsonPath.stringAt('$$.Map.Item.Value'),
+        instanceId: sfn.JsonPath.stringAt('$$.Map.Item.Value.instanceId'),
+        name: sfn.JsonPath.stringAt('$$.Map.Item.Value.name'),
         sessionId: sfn.JsonPath.stringAt('$$.Execution.Name'),
         retryCount: 0,
       },

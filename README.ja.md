@@ -115,7 +115,7 @@ aws ec2 create-tags --region ap-northeast-1 \
 ## 動作確認
 
 - 待たずに試す場合は、Step Functions ステートマシンを**手動で Start execution**（入力は `{}`）
-- LINE に「継続 / 停止」の Quick Reply 付きメッセージが届く
+- LINE に「継続 / 停止」の Quick Reply 付きメッセージが届く（本文にインスタンス ID と Name タグを表示）
   - **継続** → そのセッションは終了（停止しない）
   - **停止** → 即 `ec2:StopInstances` が実行される
   - **無応答** → `wait_minutes`（既定 5 分）後に再送 → `max_retry`（既定 1）回で自動停止

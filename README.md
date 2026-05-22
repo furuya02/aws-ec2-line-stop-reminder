@@ -115,7 +115,7 @@ aws ec2 create-tags --region ap-northeast-1 \
 ## Try it
 
 - To test without waiting, **Start execution** on the Step Functions state machine manually (input `{}`)
-- A LINE message with "continue / stop" Quick Reply buttons arrives
+- A LINE message with "continue / stop" Quick Reply buttons arrives (the body shows the instance ID and its Name tag)
   - **continue** → that session ends (no stop)
   - **stop** → `ec2:StopInstances` runs immediately
   - **no response** → resend after `wait_minutes` (default 5 min) → auto-stop after `max_retry` (default 1) resends
