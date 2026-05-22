@@ -1,6 +1,6 @@
 # aws-ec2-line-stop-reminder
 
-起動中の EC2 インスタンスに対して **60 分ごとに LINE で「継続 / 停止」を確認**し、無応答が続いたら**自動停止**する仕組み（停止忘れ防止）。確認間隔はデプロイ時に変更できます（既定 60 分）。
+起動中の EC2 インスタンスに対して **毎時 0 分（1 時間ごと）に LINE で「継続 / 停止」を確認**し、無応答が続いたら**自動停止**する仕組み（停止忘れ防止）。起動スケジュールはデプロイ時に変更できます（既定 `cron(0 * * * ? *)`、`-c schedule` で cron / rate 指定）。
 
 - 受動的に「使ってなさそうなら止める」のではなく、**LINE で能動的に「まだ使ってる？」と問いかける**方式
 - 対象は **タグ `AutoStopNotify=true`** が付いた EC2 インスタンス
@@ -11,7 +11,7 @@
 ## アーキテクチャ
 
 ```
-EventBridge Scheduler (60分ごと・既定)
+EventBridge Scheduler (毎時0分・既定 cron)
   └─> Step Functions ステートマシン
         CheckRunning (タグ付き running を列挙)
           └─> Map (インスタンスごと)
@@ -32,7 +32,7 @@ LINE Webhook:
 | リソース | 用途 | 固定費 |
 |---|---|---|
 | Step Functions | 通知〜判定のフロー | なし(状態遷移の従量) |
-| EventBridge Scheduler | 60分ごとの起動（既定・変更可） | なし |
+| EventBridge Scheduler | 毎時0分に起動（既定 cron・`-c schedule` で変更可） | なし |
 | Lambda × 4 | check_running / notifier / stopper / responder | なし |
 | DynamoDB (オンデマンド) | タスクトークンの受け渡し | **なし** |
 | API Gateway (REST) | LINE Webhook 受け口 | なし |
@@ -74,8 +74,9 @@ pnpm exec cdk deploy
 
 デプロイ後、Outputs の `WebhookUrl` を控えます。
 
-> デモ用に間隔を短縮したい場合:
-> `pnpm exec cdk deploy -c interval_minutes=5 -c wait_minutes=1 -c max_retry=2`
+> デモ用に再送待ち/回数を短縮したい場合:
+> `pnpm exec cdk deploy -c wait_minutes=1 -c max_retry=1`（即確認はステートマシンを手動実行）
+> 起動スケジュール変更: `-c schedule="cron(0 */2 * * ? *)"` や `-c schedule="rate(30 minutes)"`（**間隔は 1 セッション長 `wait_minutes ×(max_retry+1)` より長く**）
 > アカウントID部分の上書き: `-c suffix=20260521`
 
 ### 4. LINE トークンを SSM に登録
@@ -136,7 +137,7 @@ cd scripts
   - Step Functions の状態遷移（月数十円程度）
   - LINE Messaging API のフリープラン超過（日本は**月 200 通**まで無料）。
     カウントされるのは Push のみ（宛先 1 人あたり 1 通）。タップへの確認返信(reply)は即時応答のためカウントされません。
-    60 分ごと + 無応答時の再送が積み重なると無料枠を超える可能性があります。
+    1 時間ごと + 無応答時の再送が積み重なると無料枠を超える可能性があります。
 - 通知には「**今月の無料枠 残り 約 N 通**」を併記します（`GET /v2/bot/message/quota/consumption` で取得、無料枠は `FREE_QUOTA` 環境変数で既定 200）。
 - **監視対象 EC2 自体の課金は別**です。本仕組みは停止忘れを減らしますが、課金停止の最終責任は利用者にあります。
 

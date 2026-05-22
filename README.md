@@ -1,6 +1,6 @@
 # aws-ec2-line-stop-reminder
 
-A mechanism that **asks "continue / stop?" via LINE every 60 minutes** for running EC2 instances and **auto-stops** them when there is no response (prevents leaving instances running). The interval is configurable at deploy time (default 60 minutes).
+A mechanism that **asks "continue / stop?" via LINE at the top of every hour** for running EC2 instances and **auto-stops** them when there is no response (prevents leaving instances running). The schedule is configurable at deploy time (default `cron(0 * * * ? *)`; override with `-c schedule`).
 
 - Instead of passively stopping "idle-looking" instances, it **actively asks "are you still using this?" over LINE**
 - Targets EC2 instances tagged **`AutoStopNotify=true`**
@@ -11,7 +11,7 @@ A mechanism that **asks "continue / stop?" via LINE every 60 minutes** for runni
 ## Architecture
 
 ```
-EventBridge Scheduler (every 60 min)
+EventBridge Scheduler (top of every hour)
   └─> Step Functions state machine
         CheckRunning (list tagged running instances)
           └─> Map (per instance)
@@ -32,7 +32,7 @@ LINE Webhook:
 | Resource | Purpose | Fixed cost |
 |---|---|---|
 | Step Functions | Notify → evaluate flow | none (per-transition) |
-| EventBridge Scheduler | Trigger every 60 min (default, configurable) | none |
+| EventBridge Scheduler | Trigger at minute 0 every hour (default cron, configurable via `-c schedule`) | none |
 | Lambda × 4 | check_running / notifier / stopper / responder | none |
 | DynamoDB (on-demand) | Pass the task token | **none** |
 | API Gateway (REST) | LINE Webhook endpoint | none |
@@ -74,8 +74,9 @@ pnpm exec cdk deploy
 
 Note the `WebhookUrl` from the Outputs.
 
-> To shorten intervals for a demo:
-> `pnpm exec cdk deploy -c interval_minutes=5 -c wait_minutes=1 -c max_retry=2`
+> To shorten the resend wait/count for a demo:
+> `pnpm exec cdk deploy -c wait_minutes=1 -c max_retry=1` (for an immediate check, start the state machine manually)
+> Change the schedule: `-c schedule="cron(0 */2 * * ? *)"` or `-c schedule="rate(30 minutes)"` (**keep the interval longer than one session = `wait_minutes ×(max_retry+1)`**)
 > Override the account-id part: `-c suffix=20260521`
 
 ### 4. Store LINE tokens in SSM
@@ -136,7 +137,7 @@ Runs `cdk destroy` + deletes SSM parameters + residual check.
   - Step Functions state transitions (a few tens of yen / month)
   - LINE Messaging API beyond the free tier (in Japan, **200 messages/month** free).
     Only push messages count (1 per recipient); reply messages to a tap are not counted (immediate response).
-    Frequent 60-min notifications plus resends may exceed the free tier.
+    Frequent hourly notifications plus resends may exceed the free tier.
 - Each notification appends the **remaining free quota** ("残り 約 N 通") via `GET /v2/bot/message/quota/consumption` (free tier set by the `FREE_QUOTA` env var, default 200).
 - **Billing for the monitored EC2 itself is separate.** This reduces forgotten instances but the responsibility to stop billing remains with the user.
 
